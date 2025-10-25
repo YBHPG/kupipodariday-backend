@@ -1,25 +1,23 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { UsersModule } from '../users/users.module';
+import { HashModule } from '../hash/hash.module'; // 👈 добавляем
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { UsersModule } from '../users/users.module';
-import { HashModule } from '../hash/hash.module';
-import { PassportModule } from '@nestjs/passport';
-import { JwtModule } from '@nestjs/jwt';
-import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
     UsersModule,
-    HashModule,
     PassportModule,
     JwtModule.register({
-      secret: 'super-secret-key', // ⚠️ Лучше вынести в .env
+      secret: process.env.JWT_SECRET || 'supersecret',
       signOptions: { expiresIn: '7d' },
     }),
+    HashModule, // 👈 вот эта строка обязательна
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy],
 })
 export class AuthModule {}
