@@ -45,13 +45,6 @@ export class WishlistsService {
     return this.wishlistsRepository.save(list);
   }
 
-  async findOne(query: FindOptionsWhere<Wishlist>): Promise<Wishlist | null> {
-    return this.wishlistsRepository.findOne({
-      where: query,
-      relations: ['owner', 'items'],
-    });
-  }
-
   async findMany(query: FindOptionsWhere<Wishlist>): Promise<Wishlist[]> {
     return this.wishlistsRepository.find({
       where: query,
@@ -60,31 +53,48 @@ export class WishlistsService {
   }
 
   async updateOneOwnerGuard(
-    ownerId: number,
+    userId: number,
     id: number,
-    patch: UpdateWishlistDto,
-  ): Promise<Wishlist> {
-    const list = await this.findOne({ id });
-    if (!list) throw new NotFoundException('Wishlist not found');
-    if (list.owner.id !== ownerId)
-      throw new ForbiddenException('Cannot edit others wishlists');
-
-    if (Array.isArray((patch as any).items)) {
-      const items = await this.wishesRepository.findByIds((patch as any).items);
-      (list as any).items = items;
-      delete (patch as any).items;
+    updateDto: UpdateWishlistDto,
+  ) {
+    const list = await this.findOne(id);
+    if (!list) {
+      throw new Error('Wishlist not found');
+    }
+    if (list.owner.id !== userId) {
+      throw new Error('Access denied');
     }
 
-    Object.assign(list, patch);
+    Object.assign(list, updateDto);
     return this.wishlistsRepository.save(list);
   }
 
-  async removeOneOwnerGuard(ownerId: number, id: number): Promise<boolean> {
-    const list = await this.findOne({ id });
-    if (!list) return false;
-    if (list.owner.id !== ownerId)
-      throw new ForbiddenException('Cannot delete others wishlists');
-    await this.wishlistsRepository.remove(list);
-    return true;
+  async removeOneOwnerGuard(userId: number, id: number) {
+    const list = await this.findOne(id);
+    if (!list) {
+      throw new Error('Wishlist not found');
+    }
+    if (list.owner.id !== userId) {
+      throw new Error('Access denied');
+    }
+
+    return this.wishlistsRepository.remove(list);
+  }
+
+  async findAll(userId: number) {
+    return this.wishlistsRepository.find({
+      where: { owner: { id: userId } },
+      relations: ['owner', 'items'],
+    });
+  }
+
+  /**
+   * Получить один список по ID
+   */
+  async findOne(id: number) {
+    return this.wishlistsRepository.findOne({
+      where: { id },
+      relations: ['owner', 'items'],
+    });
   }
 }

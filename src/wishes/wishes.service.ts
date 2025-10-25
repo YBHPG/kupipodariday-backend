@@ -131,4 +131,23 @@ export class WishesService {
 
     return copy;
   }
+
+  async findLast() {
+    return this.wishesRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 40,
+      relations: ['owner', 'offers'],
+    });
+  }
+
+  /**
+   * Найти топ-желания (по количеству копий)
+   */
+  async findTop() {
+    return this.wishesRepository.find({
+      order: { copied: 'DESC' },
+      take: 20,
+      relations: ['owner', 'offers'],
+    });
+  }
 }

@@ -2,67 +2,93 @@ import {
   Controller,
   Get,
   Post,
-  Param,
-  Body,
-  UseGuards,
-  Req,
   Patch,
   Delete,
+  Param,
+  Body,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { WishesService } from './wishes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateWishDto } from './dto/create-wish.dto';
+import { UpdateWishDto } from './dto/update-wish.dto';
+import { Request } from 'express';
 
+@UseGuards(JwtAuthGuard)
 @Controller('wishes')
 export class WishesController {
   constructor(private readonly wishesService: WishesService) {}
 
+  /**
+   * Создать новое желание
+   * POST /wishes
+   */
+  @Post()
+  async create(@Req() req: Request, @Body() dto: CreateWishDto) {
+    return this.wishesService.create(req.user['id'], dto);
+  }
+
+  /**
+   * Получить последнее добавленные желания
+   * GET /wishes/last
+   */
   @Get('last')
-  async last() {
-    return this.wishesService.latest();
+  async findLast() {
+    return this.wishesService.findLast();
   }
 
+  /**
+   * Получить самые популярные желания
+   * GET /wishes/top
+   */
   @Get('top')
-  async top() {
-    return this.wishesService.top();
+  async findTop() {
+    return this.wishesService.findTop();
   }
 
+  /**
+   * Получить желание по ID (требует авторизацию)
+   * GET /wishes/:id
+   */
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.wishesService.findOne({ id: Number(id) });
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post()
-  async create(
-    @Req() req,
-    @Body() body: import('./dto/create-wish.dto').CreateWishDto,
-  ) {
-    return this.wishesService.create(req.user.userId, body);
-  }
-
-  @UseGuards(JwtAuthGuard)
+  /**
+   * Обновить желание
+   * PATCH /wishes/:id
+   */
   @Patch(':id')
   async update(
-    @Req() req,
+    @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: import('./dto/update-wish.dto').UpdateWishDto,
+    @Body() dto: UpdateWishDto,
   ) {
     return this.wishesService.updateOneOwnerGuard(
-      req.user.userId,
+      req.user['id'],
       Number(id),
-      body,
+      dto,
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  /**
+   * Удалить желание
+   * DELETE /wishes/:id
+   */
   @Delete(':id')
-  async remove(@Req() req, @Param('id') id: string) {
-    return this.wishesService.removeOneOwnerGuard(req.user.userId, Number(id));
+  async remove(@Req() req: Request, @Param('id') id: string) {
+    return this.wishesService.removeOneOwnerGuard(req.user['id'], Number(id));
   }
 
-  @UseGuards(JwtAuthGuard)
+  /**
+   * Скопировать чужое желание к себе
+   * POST /wishes/:id/copy
+   */
   @Post(':id/copy')
-  async copy(@Req() req, @Param('id') id: string) {
-    return this.wishesService.copy(Number(id), req.user.userId);
+  async copy(@Req() req: Request, @Param('id') id: string) {
+    return this.wishesService.copy(Number(id), req.user['id']);
   }
 }

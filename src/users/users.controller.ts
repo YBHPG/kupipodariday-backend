@@ -1,59 +1,81 @@
 import {
   Controller,
   Get,
-  Query,
-  Param,
+  Post,
   Patch,
+  Param,
   Body,
-  UseGuards,
   Req,
-  ForbiddenException,
-  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { Request } from 'express';
 
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // Поиск по строке: email OR username
-  @UseGuards(JwtAuthGuard)
+  /**
+   * Получить информацию о текущем пользователе
+   * GET /users/me
+   */
   @Get('me')
-  async getMe(@Req() req) {
-    if (!req.user || !req.user.userId) {
-      throw new UnauthorizedException('Missing or invalid token');
-    }
-    return this.usersService.findOne({ id: req.user.userId });
+  async getMe(@Req() req: Request) {
+    return this.usersService.findOne({ id: req.user['id'] });
   }
 
-  // Просмотр чужого профиля
-  @Get(':id')
-  async getById(@Param('id') id: string) {
-    const userId = Number(id);
-    return this.usersService.findOne({ id: userId });
-  }
-
-  // Просмотр своего профиля
-  @UseGuards(JwtAuthGuard)
-  @Get('me/profile')
-  async me(@Req() req) {
-    const me = await this.usersService.findOne({ id: req.user.userId });
-    if (!me) return null;
-    // Пароль скрыт глобально, email добавляем в явном виде по требованиям чек-листа
-    return { ...me, email: (me as any).email };
-  }
-
-  // Редактирование своего профиля
-  @UseGuards(JwtAuthGuard)
+  /**
+   * Обновить информацию о текущем пользователе
+   * PATCH /users/me
+   */
   @Patch('me')
-  async updateMe(
-    @Req() req,
-    @Body() body: import('./dto/update-user.dto').UpdateUserDto,
-  ) {
-    // Нельзя редактировать чужой профиль
-    const userId = req.user.userId;
-    // Хеширование пароля переносим в сервис UsersService.updateOneIfOwner
-    return this.usersService.updateOneIfOwner(userId, body);
+  async updateMe(@Req() req: Request, @Body() body: UpdateUserDto) {
+    return this.usersService.updateOneIfOwner(req.user['id'], body);
+  }
+
+  /**
+   * Получить собственные желания пользователя
+   * GET /users/me/wishes
+   */
+  @Get('me/wishes')
+  async getMyWishes(@Req() req: Request) {
+    const me = await this.usersService.findOne({ id: req.user['id'] });
+    return me?.wishes ?? [];
+  }
+
+  /**
+   * Получить публичный профиль пользователя
+   * GET /users/:username
+   */
+  @Get(':username')
+  async getPublicByUsername(@Param('username') username: string) {
+    const user = await this.usersService.findOne({ username });
+    if (!user) return null;
+    const { id, username: u, about, avatar, createdAt, updatedAt } = user;
+    return { id, username: u, about, avatar, createdAt, updatedAt };
+  }
+
+  /**
+   * Получить публичный список желаний пользователя
+   * GET /users/:username/wishes
+   */
+  @Get(':username/wishes')
+  async getUserWishes(@Param('username') username: string) {
+    const user = await this.usersService.findOne({ username });
+    return user?.wishes ?? [];
+  }
+
+  /**
+   * Найти пользователей по email или username
+   * POST /users/find
+   */
+  @Post('find')
+  async findMany(@Body() body: { query: string }) {
+    const q = body?.query?.trim();
+    if (!q) return [];
+    return this.usersService.searchByLoginOrEmail(q);
   }
 }
